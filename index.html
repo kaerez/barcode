@@ -1,0 +1,323 @@
+
+<!doctype html>
+<html><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boarding-Pass Barcode Aztec QR Generator</title>
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+  ga('create', 'UA-2231125-6', 'auto');
+  ga('send', 'pageview');
+</script>
+
+
+<script type="text/javascript">
+"use strict"
+    
+    
+var textOut = null
+var textIn = ""
+var fields = {}
+
+var run, getDayOfYear
+var ctx = null
+    
+function start() 
+{
+    run = Module.cwrap('run', null, ['number', 'string', 'number', 'number'])
+
+    ctx = theimg3.getContext('2d')
+
+ //   var d = new Date()
+ //   var dy = getDayOfYear(d.getDate(), d.getMonth(), d.getFullYear())
+  //  dayOfYearEd.value = '' + dy
+    dateEd.value = todayInputValue()
+    
+    formatName()
+    formatField('bookRef')
+    formatField('from')
+    formatField('to')
+    formatField('fOp')
+    formatField('fNum')
+    readDate()
+    formatClass()
+    formatSeat()
+    formatSeqNum()
+    format()
+}
+
+function errclear() {
+    errMsg.innerHTML = ''
+    errMsg.style.visibility = 'hidden'
+}
+function err(msg) {
+    if (errMsg.innerHTML == '') {
+        errMsg.innerHTML = msg
+        errMsg.style.visibility = 'visible'
+    }
+}
+
+function update(fromRaw)
+{
+    if (!fromRaw)
+        textEdit.value = textIn
+    else
+        textIn = textEdit.value
+    var ecc =  parseInt(eccSelect.value)
+    var ssize = parseInt(symSize.value)  // if this is 0, ecc is used
+    var btype = parseInt(codeTypeSel.value)
+    run(btype, textIn, ecc, ssize)
+    
+ //   theimg.innerHTML = textOut
+    
+    theimg2.onload = function() {
+        theimg3.width = theimg2.width
+        theimg3.height = theimg2.height
+        ctx.drawImage(theimg2, 0, 0)
+    }
+ 
+    var b = new Blob([textOut], {type: "image/svg+xml"});
+    var reader = new FileReader();
+    reader.onload = function(e) { 
+        theimg2.src = e.target.result 
+    }
+    reader.onerror = function(e) {
+        console.log(e)
+    }
+    reader.readAsDataURL(b); // read as data URL since we want to put it in an img src
+        
+}
+
+function format() {
+    textIn = "M1" + fields.name + "E" + fields.bookRef + fields.from + fields.to 
+             + fields.fOp + fields.fNum + fields.date + fields.cls + fields.seat + fields.seqNum
+             + "1" + "00"
+             // 1 passenger status, 00 - hex length of following data
+    update()
+}
+function upPadRight(s, n) {
+    s = s.toUpperCase()
+    while(s.length < n)
+        s = s + ' ';
+    return s.substr(0,n)
+}
+
+function padLeft(s, n) {
+    s = s.toUpperCase()
+    while(s.length < n)
+        s = '0' + s;
+    return s.substr(0,n)
+}
+
+function formatName(doRun) {
+    errclear()
+    if (lastNameEd.value.length > 18) // need space for slash and last name
+        err("first name longer than 18 charcters")
+    var v = lastNameEd.value + "/" + firstNameEd.value
+    if (v.length > 20)
+        err("first+last name longer than 20 characters")
+
+    fields.name = upPadRight(v, 20)
+    if (doRun)
+        format()
+}
+
+var fldDef = {
+    'bookRef': { pad: 7, desc:"Booking Ref"},
+    'from':    { pad: 3, desc:"From"},
+    'to':      { pad: 3, desc:"To"},
+    'fOp':     { pad: 3, desc:"Flight Operator"},
+    'fNum':    { pad: 5, desc:"Flight Number"}
+}
+
+function formatField(name, doRun) {
+    errclear('')
+    var def = fldDef[name]
+    var v = document.getElementById(name + "Ed").value
+    if (v.length > def.pad)
+        err('"' + def.desc + '" longer than ' + def.pad + " chars")
+    fields[name] = upPadRight(v, def.pad)
+    if (doRun)
+        format()
+}
+
+function formatDay(doRun) {
+    fields.date = padLeft(dayOfYearEd.value, 3)
+    if (doRun)
+        format()
+}
+function todayInputValue() { // http://stackoverflow.com/questions/6982692/html5-input-type-date-default-value-to-today
+    var local = new Date();
+ //   local.setMinutes(this.getMinutes() - this.getTimezoneOffset());
+    return local.toJSON().slice(0,10);
+}
+
+function dayOfYear(yr, mon, mday)
+{
+    var now = new Date(yr, mon, mday, 1, 0, 0)
+    var start = new Date(yr, 0, 1, 0, 0);
+    var diff = now - start;
+    var oneDay = 1000 * 60 * 60 * 24;
+    var day = Math.floor(diff / oneDay) + 1; // start at 1
+    return day
+}
+
+function readDate(toRun) {
+    var dl = dateEd.value.split('-')
+    var mday = parseInt(dl[2])
+    var mon = parseInt(dl[1]) - 1  // the range of the input is [1-12]
+    var yr = parseInt(dl[0])
+    
+    dayOfYearEd.value = dayOfYear(yr, mon, mday)
+    formatDay(toRun)
+}
+function formatClass(doRun) {
+    fields.cls = classSel.value
+    if (doRun)
+        format()
+}
+function formatSeat(doRun) {
+    errclear()
+    var n = seatNumEd.value
+    if (n.length > 4)
+        err("Seat longer than 4 chars")
+    fields.seat = padLeft(n, 4)
+    if (doRun)
+        format()
+}
+function formatSeqNum(doRun) {
+    errclear()
+    var n = seqNumEd.value
+    if (n.length > 4)
+        err("Seat longer than 4 chars")    
+    fields.seqNum = upPadRight(padLeft(n, 4), 5)
+    if (doRun)
+        format()
+}    
+
+function typeUpdate() {
+    if (codeTypeSel.value == "0")
+        symSize.value = "11"  // size of the aztec
+    else
+        symSize.value = "6"  // columns in the barcode
+    update()
+}
+
+</script>
+<script src="js_qr_brd.js"></script>
+<style>
+#textEdit {
+    width: 100%;
+    max-width: 500px;
+}
+body, input {
+    font-family: monospace;
+}
+input, #classSel {
+    font-size: 130%;
+}
+#errMsg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    color: red;
+    font-size: 130%;
+    background-color: #fee;
+    text-align: center;
+    width: 96%;
+    padding: 4px;
+    border: red solid 1px;
+    visibility: hidden;
+    max-width: 500px;
+}
+#theimg {
+    margin: 5px;
+    max-width: 500px;
+    margin: 20px 0 420px 0;    
+}
+#theimg2 {
+   /*display: none;*/
+   visibility: hidden;
+   position: fixed; /* IE display none causes size to be 0 */
+}
+#theimg3 {
+    width: 100%;
+    margin: 5px;
+    max-width: 500px;
+    margin: 20px 0 420px 0;    
+}
+.unimpCol {
+    color: #bbb;
+}
+#inputArea {
+    font-size: 120%;
+}
+.tlabel {
+    display: inline-block;
+    margin-top: 7px;
+}
+#codeTypeSel {
+    font-size: 120%;
+}
+
+</style>
+</head>
+<body id="body" onload="start()" >
+<div id="errMsg"></div>
+<div id="inputArea">
+<span class="tlabel">First Name</span><br>
+<input id="firstNameEd" type="text" value="John" oninput="formatName(true)"><br>
+<span class="tlabel">Last Name</span><br>
+<input id="lastNameEd" type="text" value="Doe" oninput="formatName(true)"><br>
+<span class="unimpCol tlabel">Booking-Ref</span><br>
+<input id="bookRefEd" class="unimpCol" type="text" value="XYZ123" oninput="formatField('bookRef', true)"><br>
+<span class="tlabel">From</span><br>
+<input id="fromEd" type="text" value="ZRH" oninput="formatField('from', true)"><br>
+<span class="tlabel">To</span><br>
+<input id="toEd" type="text" value="SFO" oninput="formatField('to', true)"><br>
+<span class="tlabel">Flight Operator</span><br>
+<input id="fOpEd" type="text" value="BA" oninput="formatField('fOp',true)"><br>
+<span class="tlabel">Flight Number</span><br>
+<input id="fNumEd" type="text" value="1234" oninput="formatField('fNum', true)"><br>
+<span class="tlabel">Date</span><br>
+<input id="dateEd" type="date" oninput="readDate(true)"><br>
+<span class="unimpCol tlabel">Day in year</span><br>
+<input id="dayOfYearEd" type="text" class="unimpCol" value="0" oninput="formatDay(true)"><br>
+<span class="tlabel">Class</span><br>
+<select id="classSel" onchange="formatClass(true)">
+  <option value="F">First</option>
+  <option value="C">Business</option>
+  <option value="Y">Economy</option>
+</select><br>
+<span class="tlabel">Seat</span><br>
+<input id="seatNumEd" type="text" value="35A" oninput="formatSeat(true)"><br>
+<span class="unimpCol tlabel">Boarding Index</span><br>
+<input id="seqNumEd" class="unimpCol" type="text" value="0001" oninput="formatSeqNum(true)"><br>
+</div>
+<span class="unimpCol">Raw Data:</span><br>
+<textarea id="textEdit" rows="4" cols="50" class="unimpCol" oninput="update(true)">
+hello</textarea>
+<br><span class="unimpCol">Error-Correction</span>
+<select id="eccSelect" class="unimpCol" onchange="update()">
+  <option value="0">-1</option>
+  <option value="0">0</option>
+  <option value="1">1</option>
+  <option value="2">2</option>
+  <option value="3">3</option>
+</select>
+<br><span class="unimpCol">Symbol-Size</span>
+<input id="symSize" type="number" class="unimpCol" onchange="update()" value="11">
+<br><select id="codeTypeSel" class="unimpCol" onchange="typeUpdate()">
+  <option value="0">aztec</option>
+  <option value="1">pdf417</option>
+</select>
+
+<br><br>
+<!-- <div id="theimg"></div> -->
+ <img id="theimg2">   
+ <canvas id="theimg3"></canvas>
+</body>
+</html>
